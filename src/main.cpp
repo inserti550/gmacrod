@@ -84,12 +84,12 @@ int main(int argc, char* argv[]) {
 
     std::thread buttont(button_thread);
     std::thread lcdt(lcd_thread);
-    std::thread lcdt(lcd_thread);
+    std::thread ipct(ipc_thread);
 
     buttont.join();
     lcdt.join();
-    lcdt.join();
-    
+    ipct.join();
+
     free(canvas);
     return 0;
 }

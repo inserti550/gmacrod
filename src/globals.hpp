@@ -20,12 +20,15 @@
 #include <filesystem>
 #include <memory>
 #include <fstream>
+#include <sys/stat.h>
 
 #include "json.hpp"
 #include "profile/profile.hpp"
 #include "button_thread/recorder.hpp"
 #include "button_thread/button.hpp"
 #include "button_thread/virtual_keyboard.hpp"
+#include "lcd_thread/lcd.hpp"
+#include "ipc_thread/ipc.hpp"
 
 extern std::atomic<bool> running;
 

@@ -16,6 +16,8 @@ set(PROJECT_SOURCES
     src/json.hpp
     src/profile/profile.hpp
     src/profile/profile.cpp
+    src/ipc_thread/ipc.cpp
+    src/ipc_thread/ipc.hpp
 )
 
 add_executable(${PROJECT_NAME} ${PROJECT_SOURCES})
