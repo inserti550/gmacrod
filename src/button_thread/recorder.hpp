@@ -5,10 +5,9 @@ private:
     std::vector<int> fds;
     std::thread worker_thread;
     std::atomic<bool> is_running{false};
-    
+
     std::vector<action> recorded_macro;
-    
-    std::function<void(const std::vector<action>&)> on_done_callback;
+    std::mutex macro_mtx;
 
     bool is_real_keyboard(int fd, const std::string& name) {
         if (name == "G15 macro keyboard") return false;
@@ -43,14 +42,16 @@ private:
                     while (read(poll_fds[i].fd, &ev, sizeof(ev)) > 0) {
                         if (ev.type == EV_KEY && (ev.value == 0 || ev.value == 1)) {
                             auto now = std::chrono::steady_clock::now();
-                            int delta_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now - last_event_time).count();
+                            uint64_t delta_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                now - last_event_time).count();
                             last_event_time = now;
 
                             action btn;
-                            btn.key = ev.code;
+                            btn.key     = ev.code;
                             btn.release = (ev.value == 0);
-                            btn.delay = delta_ms;
+                            btn.delay   = delta_ms;
 
+                            std::lock_guard<std::mutex> lk(macro_mtx);
                             recorded_macro.push_back(btn);
                         }
                     }
@@ -60,9 +61,7 @@ private:
     }
 
 public:
-    macro_recorder(std::function<void(const std::vector<action>&)> on_done) 
-        : on_done_callback(on_done) 
-    {
+    macro_recorder() {
         namespace fs = std::filesystem;
         if (!fs::exists("/dev/input")) return;
 
@@ -92,23 +91,21 @@ public:
 
         is_running = true;
         worker_thread = std::thread(&macro_recorder::record_loop, this);
-        std::cout << "recording start: " << fds.size() << "\n";
     }
 
     ~macro_recorder() {
-        std::cout << "killing\n";
-        
         is_running = false;
-        if (worker_thread.joinable()) {
+        if (worker_thread.joinable())
             worker_thread.join();
-        }
-
-        for (int fd : fds) {
+        for (int fd : fds)
             if (fd >= 0) close(fd);
-        }
+    }
 
-        if (on_done_callback) {
-            on_done_callback(recorded_macro);
-        }
+    std::vector<action> take_macro() {
+        is_running = false;
+        if (worker_thread.joinable())
+            worker_thread.join();
+        std::lock_guard<std::mutex> lk(macro_mtx);
+        return std::move(recorded_macro);
     }
 };

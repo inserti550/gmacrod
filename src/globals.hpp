@@ -10,7 +10,6 @@
 #include <atomic>
 #include <mutex>
 #include <condition_variable>
-#include <queue>
 #include <linux/uinput.h>
 #include <linux/input.h>
 #include <fcntl.h>
@@ -19,7 +18,6 @@
 #include <string>
 #include <chrono>
 #include <filesystem>
-#include <functional>
 #include <memory>
 #include <fstream>
 
@@ -28,18 +26,15 @@
 #include "button_thread/recorder.hpp"
 #include "button_thread/button.hpp"
 #include "button_thread/virtual_keyboard.hpp"
-#include "lcd_thread/lcd.hpp"
 
 extern std::atomic<bool> running;
-extern std::atomic<int>  m_state;
-extern std::atomic<bool> recording_state;
 
 extern int g15screen_fd;
 extern g15canvas* canvas;
 
 extern int  mkey_state;
 extern int  mled_state;
-extern bool recording;
+extern int macro_state;
 
 extern virtual_keyboard vk_bd;
 
@@ -48,5 +43,3 @@ extern std::string config_name;
 
 extern std::vector<std::string> profile_list;
 extern int gui_select_idx;
-
-void scan_profiles();

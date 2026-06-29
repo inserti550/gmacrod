@@ -35,6 +35,13 @@ void scan_profiles() {
     }
 }
 
+static void backup_profile(const std::filesystem::path& path) {
+    if (!std::filesystem::exists(path)) return;
+    auto backup = path;
+    backup.replace_extension(".json.bak");
+    std::filesystem::copy_file(path, backup, std::filesystem::copy_options::overwrite_existing);
+}
+
 void generate_config() {
     nlohmann::json j;
     std::vector<uint16_t> keys = {
@@ -44,22 +51,22 @@ void generate_config() {
 
     for (size_t i = 0; i < keys.size(); i++) {
         j["M1"][i] = std::vector<action>{
-            {KEY_LEFTCTRL,  false, 0},
-            {keys[i],       false, 10},
-            {keys[i],       true,  10},
-            {KEY_LEFTCTRL,  true,  10}
+            {action_type::key, KEY_LEFTCTRL, false, "", 0},
+            {action_type::key, keys[i],      false, "", 10},
+            {action_type::key, keys[i],      true,  "", 10},
+            {action_type::key, KEY_LEFTCTRL, true,  "", 10}
         };
         j["M2"][i] = std::vector<action>{
-            {KEY_LEFTSHIFT, false, 0},
-            {keys[i],       false, 10},
-            {keys[i],       true,  10},
-            {KEY_LEFTSHIFT, true,  10}
+            {action_type::key, KEY_LEFTSHIFT, false, "", 0},
+            {action_type::key, keys[i],       false, "", 10},
+            {action_type::key, keys[i],       true,  "", 10},
+            {action_type::key, KEY_LEFTSHIFT, true,  "", 10}
         };
         j["M3"][i] = std::vector<action>{
-            {KEY_LEFTALT,   false, 0},
-            {keys[i],       false, 10},
-            {keys[i],       true,  10},
-            {KEY_LEFTALT,   true,  10}
+            {action_type::key, KEY_LEFTALT, false, "", 0},
+            {action_type::key, keys[i],     false, "", 10},
+            {action_type::key, keys[i],     true,  "", 10},
+            {action_type::key, KEY_LEFTALT, true,  "", 10}
         };
     }
 
@@ -78,12 +85,23 @@ void load_config(std::string name) {
 
     nlohmann::json j;
     file >> j;
-
-    for (size_t m = 0; m < 3; ++m) {
-        if (j.contains(JSON_MODES[m]) && j[JSON_MODES[m]].is_array()) {
-            size_t available_keys = std::min(j[JSON_MODES[m]].size(), size_t(18));
-            for (size_t k = 0; k < available_keys; ++k)
-                current_profile[m][k] = j[JSON_MODES[m]][k].get<std::vector<action>>();
+    try {
+        for (size_t m = 0; m < 3; ++m) {
+            if (j.contains(JSON_MODES[m]) && j[JSON_MODES[m]].is_array()) {
+                size_t available_keys = std::min(j[JSON_MODES[m]].size(), size_t(18));
+                for (size_t k = 0; k < available_keys; ++k)
+                    current_profile[m][k] = j[JSON_MODES[m]][k].get<std::vector<action>>();
+            }
+        }
+    } catch (...) {
+        file.close();
+        if (name == "default.json") {
+            backup_profile(path);
+            generate_config();
+            std::cerr << name << " config regenerate\nbackup was creater in " << path << "\n";
+            load_config(name);
+        } else { 
+            std::cerr << "Json fields error\ntry delete config " << name << " in " << config << "\n";
         }
     }
 }

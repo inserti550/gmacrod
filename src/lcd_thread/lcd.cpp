@@ -1,10 +1,7 @@
 #include "../globals.hpp"
 
-static constexpr int LCD_W = 160;
-static constexpr int LCD_H = 43;
 static constexpr int LIST_X = 0;
 static constexpr int LIST_W = 120;
-static constexpr int HELP_X = LIST_W;
 
 static constexpr int ROW0_Y = 16;
 static constexpr int ROW1_Y = 25;
@@ -28,12 +25,12 @@ static std::string fit(const std::string& s, size_t max) {
 }
 
 static void render_help(g15canvas* c) {
-    g15r_drawLine(c, HELP_X, 0, HELP_X, LCD_H - 1, G15_COLOR_BLACK);
-
-    g15r_renderString(c, (unsigned char*)"L2:Default", 0, G15_TEXT_SMALL, HELP_X + 2, 5);
-    g15r_renderString(c, (unsigned char*)"L3:Up     ", 0, G15_TEXT_SMALL, HELP_X + 2, 13);
-    g15r_renderString(c, (unsigned char*)"L4:Down   ", 0, G15_TEXT_SMALL, HELP_X + 2, 21);
-    g15r_renderString(c, (unsigned char*)"L5:OK     ", 0, G15_TEXT_SMALL, HELP_X + 2, 29);
+	g15r_drawLine(canvas, G15_LCD_WIDTH-37, 14, G15_LCD_WIDTH, 14, G15_COLOR_BLACK);
+	g15r_drawLine(canvas, G15_LCD_WIDTH-37, 14, G15_LCD_WIDTH-37, G15_LCD_HEIGHT, G15_COLOR_BLACK);
+	g15r_renderString (canvas, (unsigned char *)"1:Default\0", 3, G15_TEXT_SMALL, G15_LCD_WIDTH-35, 0);
+	g15r_renderString (canvas, (unsigned char *)"2:     Up\0", 4, G15_TEXT_SMALL, G15_LCD_WIDTH-35, 0);
+	g15r_renderString (canvas, (unsigned char *)"3:   Down\0", 5, G15_TEXT_SMALL, G15_LCD_WIDTH-35, 0);
+	g15r_renderString (canvas, (unsigned char *)"4:     OK\0", 6, G15_TEXT_SMALL, G15_LCD_WIDTH-35, 0);
 }
 
 static void render_list(g15canvas* c) {
@@ -64,14 +61,28 @@ static void render_header(g15canvas* c) {
     std::string hdr = "Current: " + fit(config_name, 16);
     g15r_renderString(c, (unsigned char*)hdr.c_str(), 0, G15_TEXT_SMALL, 2, 4);
 
-    g15r_drawLine(c, 0, 14, LIST_W - 1, 14, G15_COLOR_BLACK);
+    g15r_drawLine(c, 0, 14, 125, 14, G15_COLOR_BLACK);
 }
 
 static void render_full(g15canvas* c) {
     g15r_clearScreen(c, G15_COLOR_WHITE);
-    render_header(c);
-    render_help(c);
-    render_list(c);
+    if(macro_state != 0){
+        switch (macro_state) {
+            case 0:
+                break;
+            case 1:
+                g15r_renderString(c, (unsigned char *)"Enter the macro", 0, G15_TEXT_MED, 2, 4);
+                g15r_renderString(c, (unsigned char *)"Press G to confirm or MR to cancel", 0, G15_TEXT_MED, 2, 35);
+                break;
+            default:
+                break;
+        }
+    }
+    else {
+        render_header(c);
+        render_help(c);
+        render_list(c);
+    }
     g15_send(g15screen_fd, (char*)c->buffer, G15_BUFFER_LEN);
 }
 

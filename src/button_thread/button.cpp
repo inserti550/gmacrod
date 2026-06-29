@@ -1,7 +1,5 @@
 #include "../globals.hpp"
 
-static int macro_state = 0;
-static int target_gkey = -1;
 static int target_mkey = 0;
 
 static std::unique_ptr<macro_recorder> recorder_ptr = nullptr;
@@ -46,14 +44,8 @@ void button_thread() {
             if (keystate == G15_KEY_M1) { mkey_state = 0; mled_state = G15_LED_M1; }
             if (keystate == G15_KEY_M2) { mkey_state = 1; mled_state = G15_LED_M2; }
             if (keystate == G15_KEY_M3) { mkey_state = 2; mled_state = G15_LED_M3; }
-
-            g15_send_cmd(g15screen_fd, G15DAEMON_MKEYLEDS, mled_state);
-
-            if (macro_state != 0) {
-                macro_state = 0;
-                recording   = false;
-                recorder_ptr.reset();
-            }
+            if (macro_state == 0)
+                g15_send_cmd(g15screen_fd, G15DAEMON_MKEYLEDS, mled_state);
             lcd_mark_dirty();
             continue;
         }
@@ -61,19 +53,17 @@ void button_thread() {
         // mr
         if (keystate == G15_KEY_MR) {
             if (macro_state == 0) {
+                target_mkey = mkey_state;
                 macro_state = 1;
-                target_gkey = -1;
-                g15_send_cmd(g15screen_fd, G15DAEMON_MKEYLEDS, G15_LED_MR | mled_state);
+                g15_send_cmd(g15screen_fd, G15DAEMON_MKEYLEDS, G15_LED_MR);
+                recorder_ptr = std::make_unique<macro_recorder>();
+                //record start
             }
             else if (macro_state == 1) {
                 macro_state = 0;
-                g15_send_cmd(g15screen_fd, G15DAEMON_MKEYLEDS, mled_state);
-            }
-            else if (macro_state == 2) {
-                macro_state = 0;
-                recording   = false;
-                g15_send_cmd(g15screen_fd, G15DAEMON_MKEYLEDS, mled_state);
                 recorder_ptr.reset();
+                g15_send_cmd(g15screen_fd, G15DAEMON_MKEYLEDS, mled_state);
+                //cancel
             }
             lcd_mark_dirty();
             continue;
@@ -86,19 +76,13 @@ void button_thread() {
                 continue;
 
             if (macro_state == 1) {
-                target_gkey = gkey;
-                target_mkey = mkey_state;
-                macro_state = 2;
-                recording   = true;
-
-                recorder_ptr = std::make_unique<macro_recorder>(
-                    [g = target_gkey, m = target_mkey](const std::vector<action>& macro) {
-                        save_recorded_macro(g, m, macro);
-                    }
-                );
-            }
-            else if (macro_state == 2) {
-
+                macro_state = 0;
+                auto recorded = recorder_ptr->take_macro();
+                recorder_ptr.reset();
+                save_recorded_macro(gkey, target_mkey, recorded);
+                g15_send_cmd(g15screen_fd, G15DAEMON_MKEYLEDS, mled_state);
+                lcd_mark_dirty();
+                //save
             }
             else {
                 on_gkey(gkey, mkey_state);
@@ -144,19 +128,22 @@ int map_gkey(unsigned long keystate) {
 
 void on_gkey(int gkey, int mkey) {
     const std::vector<action>& actfrun = current_profile[mkey][gkey];
-
     for (size_t i = 0; i < actfrun.size(); ++i) {
         const auto& act = actfrun[i];
-        if (act.release)
-            vk_bd.release_key(act.key);
-        else
-            vk_bd.press_key(act.key);
-
+        switch (act.type) {
+            case action_type::key:
+                act.release ? vk_bd.release_key(act.key) : vk_bd.press_key(act.key);
+                break;
+            case action_type::shell:
+                if (!act.cmd.empty())
+                    if (fork() == 0) { execl("/bin/sh", "sh", "-c", act.cmd.c_str(), nullptr); _exit(0); }
+                break;
+        }
         if (i < actfrun.size() - 1)
             usleep(act.delay);
     }
 }
 
-void on_mkey_change(int mkey) {
-    // TODO
-}
+//void on_mkey_change(int mkey) {
+// TODO
+//}

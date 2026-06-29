@@ -1,15 +1,14 @@
 #include "globals.hpp"
 
 std::atomic<bool> running         = true;
-std::atomic<int>  m_state         = 0;
-std::atomic<bool> recording_state = false;
 
 int g15screen_fd = -1;
 g15canvas* canvas = nullptr;
 
 int  mkey_state = 0;
 int  mled_state = G15_LED_M1;
-bool recording  = false;
+
+int macro_state = 0;
 
 virtual_keyboard vk_bd;
 
@@ -85,10 +84,12 @@ int main(int argc, char* argv[]) {
 
     std::thread buttont(button_thread);
     std::thread lcdt(lcd_thread);
+    std::thread lcdt(lcd_thread);
 
     buttont.join();
     lcdt.join();
-
+    lcdt.join();
+    
     free(canvas);
     return 0;
 }

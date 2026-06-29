@@ -4,12 +4,17 @@
 #include <string>
 #include <array>
 
+enum class action_type : uint8_t { key, shell };
+
 struct action {
-    uint16_t key;
-    bool release;
-    uint64_t delay;
+    action_type type    = action_type::key; 
+    uint16_t    key     = 0;
+    bool        release = false;
+    std::string cmd;
+    uint64_t    delay   = 0;
 };
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(action, key, release, delay)
+
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(action, type, key, release, cmd, delay)
 
 using profile_data_t = std::array<std::array<std::vector<action>, 18>, 3>;
 inline profile_data_t current_profile;
