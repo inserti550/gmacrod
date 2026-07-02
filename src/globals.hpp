@@ -26,6 +26,7 @@
 #include "profile/profile.hpp"
 #include "button_thread/recorder.hpp"
 #include "button_thread/button.hpp"
+#include "button_thread/runs.h"
 #include "button_thread/virtual_keyboard.hpp"
 #include "lcd_thread/lcd.hpp"
 #include "ipc_thread/ipc.hpp"

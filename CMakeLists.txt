@@ -18,6 +18,8 @@ set(PROJECT_SOURCES
     src/profile/profile.cpp
     src/ipc_thread/ipc.cpp
     src/ipc_thread/ipc.hpp
+        src/button_thread/runs.cpp
+        src/button_thread/runs.h
 )
 
 add_executable(${PROJECT_NAME} ${PROJECT_SOURCES})

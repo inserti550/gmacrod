@@ -13,6 +13,8 @@ This project aims to become a replacement for g15macro. g15macro is deprecated a
 - Profile support with JSON config
 - LCD display support (G15 128×43)
 - M-key switching
+- executing bash
+- Cycles! Repetitions and delays
 
 ## Dependencies
  

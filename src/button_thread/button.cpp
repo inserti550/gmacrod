@@ -1,49 +1,96 @@
 #include "../globals.hpp"
-
+#include <bitset>
 static int target_mkey = 0;
 
 static std::unique_ptr<macro_recorder> recorder_ptr = nullptr;
 
+static constexpr unsigned long G_KEY_BITS[18] = {
+    G15_KEY_G1,  G15_KEY_G2,  G15_KEY_G3,  G15_KEY_G4,
+    G15_KEY_G5,  G15_KEY_G6,  G15_KEY_G7,  G15_KEY_G8,
+    G15_KEY_G9,  G15_KEY_G10, G15_KEY_G11, G15_KEY_G12,
+    G15_KEY_G13, G15_KEY_G14, G15_KEY_G15, G15_KEY_G16,
+    G15_KEY_G17, G15_KEY_G18
+};
+
+static std::array<bool, 18> g_prev_gkeys{};
+std::atomic<unsigned long> keystate{0};
+
 void button_thread() {
+    static bool l2release = false, l3release = false, l4release = false, l5release = false;
+
     struct pollfd fds;
     fds.fd     = g15screen_fd;
     fds.events = POLLIN;
 
     while (running)
     {
-        fds.revents = 0;
-        unsigned long keystate = 0;
-
-        if (poll(&fds, 1, 1000) > 0) {
+        if (poll(&fds, 1, 50) > 0) {
             read(g15screen_fd, &keystate, sizeof(keystate));
         }
 
-        if (keystate == 0)
-            continue;
+        std::array<bool, 18> cur_gkeys = map_gkeys(keystate);
 
-        if (keystate == G15_KEY_L2) {
+        if (macro_state == 1) {
+            for (int gk = 0; gk < 18; ++gk) {
+                if (cur_gkeys[gk] && !g_prev_gkeys[gk]) {
+                    macro_state = 0;
+                    auto recorded = recorder_ptr->take_macro();
+                    recorder_ptr.reset();
+                    save_recorded_macro(gk, target_mkey, recorded);
+                    g15_send_cmd(g15screen_fd, G15DAEMON_MKEYLEDS, mled_state);
+                    lcd_mark_dirty();
+                    break;
+                }
+            }
+        } else {
+            for (int gk = 0; gk < 18; ++gk) {
+                if (cur_gkeys[gk] && !g_prev_gkeys[gk]) {
+                    on_gkey(gk, mkey_state);
+                } else if (!cur_gkeys[gk] && g_prev_gkeys[gk]) {
+                    off_gkey(gk, mkey_state);
+                }
+            }
+        }
+        g_prev_gkeys = cur_gkeys;
+
+        if ((keystate & G15_KEY_L2) && !l2release) {
+            l2release = true;
             gui_select_default();
             continue;
+        } else if (!(keystate & G15_KEY_L2) && l2release) {
+            l2release = false;
         }
-        if (keystate == G15_KEY_L3) {
+
+        if ((keystate & G15_KEY_L3) && !l3release) {
+            l3release = true;
             gui_select_up();
             continue;
+        } else if (!(keystate & G15_KEY_L3) && l3release) {
+            l3release = false;
         }
-        if (keystate == G15_KEY_L4) {
+
+        if ((keystate & G15_KEY_L4) && !l4release) {
+            l4release = true;
             gui_select_down();
             continue;
+        } else if (!(keystate & G15_KEY_L4) && l4release) {
+            l4release = false;
         }
-        if (keystate == G15_KEY_L5) {
+
+        if ((keystate & G15_KEY_L5) && !l5release) {
+            l5release = true;
             gui_apply_selection();
             scan_profiles();
             continue;
+        } else if (!(keystate & G15_KEY_L5) && l5release) {
+            l5release = false;
         }
 
         // m
-        if (keystate == G15_KEY_M1 || keystate == G15_KEY_M2 || keystate == G15_KEY_M3) {
-            if (keystate == G15_KEY_M1) { mkey_state = 0; mled_state = G15_LED_M1; }
-            if (keystate == G15_KEY_M2) { mkey_state = 1; mled_state = G15_LED_M2; }
-            if (keystate == G15_KEY_M3) { mkey_state = 2; mled_state = G15_LED_M3; }
+        if (keystate & G15_KEY_M1 || keystate & G15_KEY_M2 || keystate & G15_KEY_M3) {
+            if (keystate & G15_KEY_M1) { mkey_state = 0; mled_state = G15_LED_M1; }
+            if (keystate & G15_KEY_M2) { mkey_state = 1; mled_state = G15_LED_M2; }
+            if (keystate & G15_KEY_M3) { mkey_state = 2; mled_state = G15_LED_M3; }
             if (macro_state == 0)
                 g15_send_cmd(g15screen_fd, G15DAEMON_MKEYLEDS, mled_state);
             lcd_mark_dirty();
@@ -51,7 +98,7 @@ void button_thread() {
         }
 
         // mr
-        if (keystate == G15_KEY_MR) {
+        if (keystate & G15_KEY_MR) {
             if (macro_state == 0) {
                 target_mkey = mkey_state;
                 macro_state = 1;
@@ -68,27 +115,6 @@ void button_thread() {
             lcd_mark_dirty();
             continue;
         }
-
-        // g
-        if (keystate >= G15_KEY_G1 && keystate <= G15_KEY_G18) {
-            int gkey = map_gkey(keystate);
-            if (gkey < 0)
-                continue;
-
-            if (macro_state == 1) {
-                macro_state = 0;
-                auto recorded = recorder_ptr->take_macro();
-                recorder_ptr.reset();
-                save_recorded_macro(gkey, target_mkey, recorded);
-                g15_send_cmd(g15screen_fd, G15DAEMON_MKEYLEDS, mled_state);
-                lcd_mark_dirty();
-                //save
-            }
-            else {
-                on_gkey(gkey, mkey_state);
-            }
-            continue;
-        }
     }
 
     close(g15screen_fd);
@@ -98,50 +124,29 @@ void save_recorded_macro(int gkey, int mkey, const std::vector<action>& macro) {
     if (gkey < 0 || gkey >= 18 || mkey < 0 || mkey >= 3)
         return;
 
-    current_profile[mkey][gkey] = macro;
+    current_profile[mkey][gkey].actions = macro;
     save_config(config_name);
 }
 
+std::array<bool, 18> map_gkeys(unsigned long keystate) {
+    std::array<bool, 18> result{};
+    for (int i = 0; i < 18; ++i)
+        result[i] = (keystate & G_KEY_BITS[i]) != 0;
+    return result;
+}
+
 int map_gkey(unsigned long keystate) {
-    switch (keystate) {
-        case G15_KEY_G1:  return 0;
-        case G15_KEY_G2:  return 1;
-        case G15_KEY_G3:  return 2;
-        case G15_KEY_G4:  return 3;
-        case G15_KEY_G5:  return 4;
-        case G15_KEY_G6:  return 5;
-        case G15_KEY_G7:  return 6;
-        case G15_KEY_G8:  return 7;
-        case G15_KEY_G9:  return 8;
-        case G15_KEY_G10: return 9;
-        case G15_KEY_G11: return 10;
-        case G15_KEY_G12: return 11;
-        case G15_KEY_G13: return 12;
-        case G15_KEY_G14: return 13;
-        case G15_KEY_G15: return 14;
-        case G15_KEY_G16: return 15;
-        case G15_KEY_G17: return 16;
-        case G15_KEY_G18: return 17;
-        default:          return -1;
-    }
+    for (int i = 0; i < 18; ++i)
+        if (keystate & G_KEY_BITS[i]) return i;
+    return -1;
 }
 
 void on_gkey(int gkey, int mkey) {
-    const std::vector<action>& actfrun = current_profile[mkey][gkey];
-    for (size_t i = 0; i < actfrun.size(); ++i) {
-        const auto& act = actfrun[i];
-        switch (act.type) {
-            case action_type::key:
-                act.release ? vk_bd.release_key(act.key) : vk_bd.press_key(act.key);
-                break;
-            case action_type::shell:
-                if (!act.cmd.empty())
-                    if (fork() == 0) { execl("/bin/sh", "sh", "-c", act.cmd.c_str(), nullptr); _exit(0); }
-                break;
-        }
-        if (i < actfrun.size() - 1)
-            usleep(act.delay);
-    }
+    start_macro(gkey, mkey);
+}
+
+void off_gkey(int gkey, int mkey) {
+    stop_macro(gkey, mkey);
 }
 
 //void on_mkey_change(int mkey) {

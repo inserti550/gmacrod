@@ -50,24 +50,28 @@ void generate_config() {
     };
 
     for (size_t i = 0; i < keys.size(); i++) {
-        j["M1"][i] = std::vector<action>{
-            {action_type::key, KEY_LEFTCTRL, false, "", 0},
-            {action_type::key, keys[i],      false, "", 10},
-            {action_type::key, keys[i],      true,  "", 10},
-            {action_type::key, KEY_LEFTCTRL, true,  "", 10}
-        };
-        j["M2"][i] = std::vector<action>{
-            {action_type::key, KEY_LEFTSHIFT, false, "", 0},
-            {action_type::key, keys[i],       false, "", 10},
-            {action_type::key, keys[i],       true,  "", 10},
-            {action_type::key, KEY_LEFTSHIFT, true,  "", 10}
-        };
-        j["M3"][i] = std::vector<action>{
-            {action_type::key, KEY_LEFTALT, false, "", 0},
-            {action_type::key, keys[i],     false, "", 10},
-            {action_type::key, keys[i],     true,  "", 10},
-            {action_type::key, KEY_LEFTALT, true,  "", 10}
-        };
+        macro m1{ macro_type::once, {
+                {action_type::key, KEY_LEFTCTRL, false, "", 0},
+                {action_type::key, keys[i],      false, "", 10},
+                {action_type::key, keys[i],      true,  "", 10},
+                {action_type::key, KEY_LEFTCTRL, true,  "", 10}
+        }};
+        macro m2{ macro_type::once, {
+                {action_type::key, KEY_LEFTSHIFT, false, "", 0},
+                {action_type::key, keys[i],       false, "", 10},
+                {action_type::key, keys[i],       true,  "", 10},
+                {action_type::key, KEY_LEFTSHIFT, true,  "", 10}
+        }};
+        macro m3{ macro_type::once, {
+                {action_type::key, KEY_LEFTALT, false, "", 0},
+                {action_type::key, keys[i],     false, "", 10},
+                {action_type::key, keys[i],     true,  "", 10},
+                {action_type::key, KEY_LEFTALT, true,  "", 10}
+        }};
+
+        j["M1"][i] = m1;
+        j["M2"][i] = m2;
+        j["M3"][i] = m3;
     }
 
     std::ofstream file(config / "profiles" / "default.json");
@@ -77,8 +81,6 @@ void generate_config() {
 
 void load_config(std::string name) {
     std::filesystem::path path = config / "profiles" / name;
-    if (!std::filesystem::exists(path))
-        generate_config();
 
     std::ifstream file(path);
     if (!file.is_open()) return;
@@ -90,7 +92,7 @@ void load_config(std::string name) {
             if (j.contains(JSON_MODES[m]) && j[JSON_MODES[m]].is_array()) {
                 size_t available_keys = std::min(j[JSON_MODES[m]].size(), size_t(18));
                 for (size_t k = 0; k < available_keys; ++k)
-                    current_profile[m][k] = j[JSON_MODES[m]][k].get<std::vector<action>>();
+                    current_profile[m][k] = j[JSON_MODES[m]][k].get<macro>();
             }
         }
     } catch (...) {
@@ -100,7 +102,7 @@ void load_config(std::string name) {
             generate_config();
             std::cerr << name << " config regenerate\nbackup was creater in " << path << "\n";
             load_config(name);
-        } else { 
+        } else {
             std::cerr << "Json fields error\ntry delete config " << name << " in " << config << "\n";
         }
     }

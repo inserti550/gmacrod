@@ -14,9 +14,18 @@ struct action {
     uint64_t    delay   = 0;
 };
 
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(action, type, key, release, cmd, delay)
+enum class macro_type : uint8_t { once, repeate, toggle };
 
-using profile_data_t = std::array<std::array<std::vector<action>, 18>, 3>;
+struct macro {
+    macro_type type = macro_type::once;
+    std::vector<action> actions;
+    uint64_t delay = 0;
+};
+
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(action, type, key, release, cmd, delay);
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(macro, type, actions, delay);
+
+using profile_data_t = std::array<std::array<macro, 18>, 3>;
 inline profile_data_t current_profile;
 
 void generate_config();
