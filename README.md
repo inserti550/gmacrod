@@ -38,3 +38,18 @@ gmacrod --help
 # to add user into input group
 usermod -a -G input $USER
 ```
+You can use IPC to controll **gmacrod**
+```
+# if u need reload profile list
+echo "reload" | sudo tee /tmp/gmacrod.pipe > /dev/null
+
+# if u need reload config
+echo "reload_config" | sudo tee /tmp/gmacrod.pipe > /dev/null
+
+# if u need resave config
+echo "resave_config" | sudo tee /tmp/gmacrod.pipe > /dev/null
+
+# if u need load config
+echo "load:profilename.json" | sudo tee /tmp/gmacrod.pipe > /dev/null
+# While load doesn't check for the presence of a config yet, you can create configs using it
+```
