@@ -1,4 +1,6 @@
 #pragma once
+#include <chrono>
+#include <thread>
 
 class virtual_keyboard {
 private:
@@ -59,12 +61,6 @@ public:
         if (uinput_fd < 0) return;
         send_event(EV_KEY, key_code, 0);
         send_event(EV_SYN, SYN_REPORT, 0);
-    }
-
-    void click_key(uint16_t key_code, int delay_ms = 50) {
-        press_key(key_code);
-        usleep(delay_ms * 1000);
-        release_key(key_code);
     }
 
     void close_device() {

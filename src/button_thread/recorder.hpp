@@ -42,8 +42,14 @@ private:
                     while (read(poll_fds[i].fd, &ev, sizeof(ev)) > 0) {
                         if (ev.type == EV_KEY && (ev.value == 0 || ev.value == 1)) {
                             auto now = std::chrono::steady_clock::now();
-                            uint64_t delta_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-                                now - last_event_time).count();
+
+                            std::lock_guard<std::mutex> lk(macro_mtx);
+                            uint64_t delta_ms = 0;
+
+                            if (!recorded_macro.empty()) {
+                                delta_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                    now - last_event_time).count();
+                            }
                             last_event_time = now;
 
                             action btn;
@@ -51,7 +57,6 @@ private:
                             btn.release = (ev.value == 0);
                             btn.delay   = delta_ms;
 
-                            std::lock_guard<std::mutex> lk(macro_mtx);
                             recorded_macro.push_back(btn);
                         }
                     }

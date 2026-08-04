@@ -13,6 +13,7 @@ void button_thread();
 
 int  map_gkey(unsigned long keystate);
 std::array<bool, 18> map_gkeys(unsigned long keystate);
+unsigned long gkey_bit(int gkey);
 
 void save_recorded_macro(int gkey, int mkey, const std::vector<action>& macro);
 

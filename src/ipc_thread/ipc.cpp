@@ -31,7 +31,10 @@ void ipc_thread() {
             std::string name = cmd.substr(5);
             save_config(config_name);
             load_config(name);
-            config_name = name;
+            {
+                std::lock_guard<std::mutex> lk(gui_mtx);
+                config_name = name;
+            }
             scan_profiles();
             lcd_mark_dirty();
         }

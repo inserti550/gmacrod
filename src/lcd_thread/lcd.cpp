@@ -8,7 +8,7 @@ static constexpr int ROW1_Y = 25;
 static constexpr int ROW2_Y = 34;
 static constexpr int ROW_H = 8;
 
-static std::mutex gui_mtx;
+std::mutex gui_mtx;
 static std::condition_variable gui_cv;
 static bool gui_dirty = true;
 void lcd_mark_dirty() {
@@ -58,7 +58,12 @@ static void render_list(g15canvas* c) {
 }
 
 static void render_header(g15canvas* c) {
-    std::string hdr = "Current: " + fit(config_name, 16);
+    std::string name_copy;
+    {
+        std::lock_guard<std::mutex> lk(gui_mtx);
+        name_copy = config_name;
+    }
+    std::string hdr = "Current: " + fit(name_copy, 16);
     g15r_renderString(c, (unsigned char*)hdr.c_str(), 0, G15_TEXT_SMALL, 2, 4);
 
     g15r_drawLine(c, 0, 14, 125, 14, G15_COLOR_BLACK);
@@ -126,7 +131,10 @@ void gui_apply_selection() {
     }
     save_config(config_name);
     load_config(chosen);
-    config_name = chosen;
+    {
+        std::lock_guard<std::mutex> lk(gui_mtx);
+        config_name = chosen;
+    }
     lcd_mark_dirty();
 }
 

@@ -1,17 +1,25 @@
-//
-// Created by nazar on 01.07.2026.
-//
-
 #include "runs.h"
+#include <chrono>
+#include <thread>
 
 std::array<std::array<std::atomic<bool>, 18>, 3> macro_running;
 std::array<std::array<std::thread, 18>, 3>       macro_threads;
 std::array<std::array<std::atomic<bool>, 18>, 3> macro_toggle_on;
 
-static void exec_actions(const std::vector<action>& actfrun) {
-    for (size_t i = 0; i < actfrun.size(); ++i) {
-        const auto& act = actfrun[i];
+static void exec_actions(const std::vector<action>& actfrun, int gkey) {
+    const unsigned long bit = gkey_bit(gkey);
+
+    for (const auto& act : actfrun) {
+        if (act.delay > 0) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(act.delay));
+        }
+
         switch (act.type) {
+            case action_type::wait_release:
+                while (running && (keystate & bit)) {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(5));
+                }
+                break;
             case action_type::key:
                 act.release ? vk_bd.release_key(act.key) : vk_bd.press_key(act.key);
                 break;
@@ -24,28 +32,28 @@ static void exec_actions(const std::vector<action>& actfrun) {
                 }
                 break;
         }
-        if (i < actfrun.size() - 1)
-            usleep(act.delay);
     }
 }
 
-static void interruptible_wait(uint64_t total_useconds, const std::atomic<bool>& flag) {
-    constexpr uint64_t step = 5000; // 5 ms
-    while (total_useconds > 0 && flag) {
-        uint64_t chunk = std::min<uint64_t>(total_useconds, step);
-        usleep(chunk);
-        total_useconds -= chunk;
+static void interruptible_wait(uint64_t total_ms, const std::atomic<bool>& flag) {
+    constexpr auto step = std::chrono::milliseconds(5);
+    auto remaining = std::chrono::milliseconds(total_ms);
+
+    while (remaining > std::chrono::milliseconds(0) && flag) {
+        auto chunk = std::min(remaining, step);
+        std::this_thread::sleep_for(chunk);
+        remaining -= chunk;
     }
 }
 
 void run_once(int gkey, int mkey) {
-    exec_actions(current_profile[mkey][gkey].actions);
+    exec_actions(current_profile[mkey][gkey].actions, gkey);
 }
 
 void run_repeate(int gkey, int mkey) {
     const macro m = current_profile[mkey][gkey];
     while (macro_running[mkey][gkey]) {
-        exec_actions(m.actions);
+        exec_actions(m.actions, gkey);
         if (!macro_running[mkey][gkey]) break;
         if (m.delay > 0)
             interruptible_wait(m.delay, macro_running[mkey][gkey]);

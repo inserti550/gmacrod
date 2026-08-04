@@ -141,6 +141,11 @@ int map_gkey(unsigned long keystate) {
     return -1;
 }
 
+unsigned long gkey_bit(int gkey) {
+    if (gkey < 0 || gkey >= 18) return 0;
+    return G_KEY_BITS[gkey];
+}
+
 void on_gkey(int gkey, int mkey) {
     start_macro(gkey, mkey);
 }

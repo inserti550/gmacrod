@@ -7,6 +7,8 @@ void to_json(nlohmann::json& j, const action& a) {
     j = nlohmann::json::object();
     if (a.type == action_type::shell) {
         j["cmd"] = a.cmd;
+    } else if (a.type == action_type::wait_release) {
+        j["type"] = static_cast<int>(a.type);
     } else {
         j["key"] = a.key;
         if (a.release)
@@ -54,13 +56,13 @@ void from_json(const nlohmann::json& j, macro& m) {
 }
 
 void scan_profiles() {
-    profile_list.clear();
-
     namespace fs = std::filesystem;
     fs::path profiles_dir = config / "profiles";
 
+    std::vector<std::string> list;
+
     if (fs::exists(profiles_dir / "default.json"))
-        profile_list.push_back("default.json");
+        list.push_back("default.json");
 
     std::vector<std::string> others;
     for (const auto& entry : fs::directory_iterator(profiles_dir)) {
@@ -72,7 +74,10 @@ void scan_profiles() {
     }
     std::sort(others.begin(), others.end());
     for (auto& n : others)
-        profile_list.push_back(n);
+        list.push_back(n);
+
+    std::lock_guard<std::mutex> lk(gui_mtx);
+    profile_list = std::move(list);
 
     gui_select_idx = 0;
     for (int i = 0; i < (int)profile_list.size(); ++i) {

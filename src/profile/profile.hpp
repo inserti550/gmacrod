@@ -4,7 +4,7 @@
 #include <string>
 #include <array>
 
-enum class action_type : uint8_t { key, shell };
+enum class action_type : uint8_t { key, shell, wait_release };
 
 struct action {
     action_type type    = action_type::key;
@@ -36,5 +36,5 @@ void load_config(std::string name);
 void save_config(std::string name);
 
 extern std::vector<std::string> profile_list;
-extern int                      gui_select_idx;
+extern int gui_select_idx;
 void scan_profiles();
