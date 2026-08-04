@@ -7,7 +7,7 @@
 enum class action_type : uint8_t { key, shell };
 
 struct action {
-    action_type type    = action_type::key; 
+    action_type type    = action_type::key;
     uint16_t    key     = 0;
     bool        release = false;
     std::string cmd;
@@ -22,8 +22,11 @@ struct macro {
     uint64_t delay = 0;
 };
 
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(action, type, key, release, cmd, delay);
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(macro, type, actions, delay);
+void to_json(nlohmann::json& j, const action& a);
+void from_json(const nlohmann::json& j, action& a);
+
+void to_json(nlohmann::json& j, const macro& m);
+void from_json(const nlohmann::json& j, macro& m);
 
 using profile_data_t = std::array<std::array<macro, 18>, 3>;
 inline profile_data_t current_profile;

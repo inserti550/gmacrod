@@ -1,5 +1,5 @@
 #include "../globals.hpp"
-#include <bitset>
+
 static int target_mkey = 0;
 
 static std::unique_ptr<macro_recorder> recorder_ptr = nullptr;
@@ -148,7 +148,3 @@ void on_gkey(int gkey, int mkey) {
 void off_gkey(int gkey, int mkey) {
     stop_macro(gkey, mkey);
 }
-
-//void on_mkey_change(int mkey) {
-// TODO
-//}

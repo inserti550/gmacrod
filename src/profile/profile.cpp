@@ -3,7 +3,55 @@
 std::vector<std::string> profile_list;
 int                      gui_select_idx = 0;
 
-inline constexpr const char* JSON_MODES[3] = { "M1", "M2", "M3" };
+void to_json(nlohmann::json& j, const action& a) {
+    j = nlohmann::json::object();
+    if (a.type == action_type::shell) {
+        j["cmd"] = a.cmd;
+    } else {
+        j["key"] = a.key;
+        if (a.release)
+            j["release"] = a.release;
+    }
+    if (a.delay != 0)
+        j["delay"] = a.delay;
+}
+
+void from_json(const nlohmann::json& j, action& a) {
+    a = action{};
+
+    if (j.contains("type")) {
+        a.type = static_cast<action_type>(j.at("type").get<int>());
+        if (j.contains("key"))     a.key     = j.at("key").get<uint16_t>();
+        if (j.contains("release")) a.release = j.at("release").get<bool>();
+        if (j.contains("cmd"))     a.cmd     = j.at("cmd").get<std::string>();
+    } else if (j.contains("cmd") && !j.at("cmd").get<std::string>().empty()) {
+        a.type = action_type::shell;
+        a.cmd  = j.at("cmd").get<std::string>();
+    } else if (j.contains("key")) {
+        a.type = action_type::key;
+        a.key  = j.at("key").get<uint16_t>();
+        if (j.contains("release")) a.release = j.at("release").get<bool>();
+    }
+
+    if (j.contains("delay"))
+        a.delay = j.at("delay").get<uint64_t>();
+}
+
+void to_json(nlohmann::json& j, const macro& m) {
+    j = nlohmann::json::object();
+    j["actions"] = m.actions;
+    if (m.type != macro_type::once)
+        j["type"] = static_cast<int>(m.type);
+    if (m.delay != 0)
+        j["delay"] = m.delay;
+}
+
+void from_json(const nlohmann::json& j, macro& m) {
+    m = macro{};
+    if (j.contains("actions")) m.actions = j.at("actions").get<std::vector<action>>();
+    if (j.contains("type"))    m.type    = static_cast<macro_type>(j.at("type").get<int>());
+    if (j.contains("delay"))   m.delay   = j.at("delay").get<uint64_t>();
+}
 
 void scan_profiles() {
     profile_list.clear();
@@ -43,36 +91,34 @@ static void backup_profile(const std::filesystem::path& path) {
 }
 
 void generate_config() {
-    nlohmann::json j;
     std::vector<uint16_t> keys = {
         KEY_1, KEY_2, KEY_3, KEY_4, KEY_5, KEY_6, KEY_7, KEY_8, KEY_9, KEY_0,
         12, 13, 26, 27, 40, 43, 110, 111
     };
 
-    for (size_t i = 0; i < keys.size(); i++) {
-        macro m1{ macro_type::once, {
+    profile_data_t p{};
+    for (size_t i = 0; i < keys.size() && i < 18; i++) {
+        p[0][i] = macro{ macro_type::once, {
                 {action_type::key, KEY_LEFTCTRL, false, "", 0},
                 {action_type::key, keys[i],      false, "", 10},
                 {action_type::key, keys[i],      true,  "", 10},
                 {action_type::key, KEY_LEFTCTRL, true,  "", 10}
         }};
-        macro m2{ macro_type::once, {
+        p[1][i] = macro{ macro_type::once, {
                 {action_type::key, KEY_LEFTSHIFT, false, "", 0},
                 {action_type::key, keys[i],       false, "", 10},
                 {action_type::key, keys[i],       true,  "", 10},
                 {action_type::key, KEY_LEFTSHIFT, true,  "", 10}
         }};
-        macro m3{ macro_type::once, {
+        p[2][i] = macro{ macro_type::once, {
                 {action_type::key, KEY_LEFTALT, false, "", 0},
                 {action_type::key, keys[i],     false, "", 10},
                 {action_type::key, keys[i],     true,  "", 10},
                 {action_type::key, KEY_LEFTALT, true,  "", 10}
         }};
-
-        j["M1"][i] = m1;
-        j["M2"][i] = m2;
-        j["M3"][i] = m3;
     }
+
+    nlohmann::json j = p;
 
     std::ofstream file(config / "profiles" / "default.json");
     if (file.is_open())
@@ -88,11 +134,21 @@ void load_config(std::string name) {
     nlohmann::json j;
     file >> j;
     try {
-        for (size_t m = 0; m < 3; ++m) {
-            if (j.contains(JSON_MODES[m]) && j[JSON_MODES[m]].is_array()) {
-                size_t available_keys = std::min(j[JSON_MODES[m]].size(), size_t(18));
+        if (j.is_array()) {
+            size_t modes = std::min(j.size(), size_t(3));
+            for (size_t m = 0; m < modes; ++m) {
+                size_t available_keys = std::min(j[m].size(), size_t(18));
                 for (size_t k = 0; k < available_keys; ++k)
-                    current_profile[m][k] = j[JSON_MODES[m]][k].get<macro>();
+                    current_profile[m][k] = j[m][k].get<macro>();
+            }
+        } else if (j.is_object()) {
+            static constexpr const char* ltabs[3] = { "M1", "M2", "M3" };
+            for (size_t m = 0; m < 3; ++m) {
+                if (j.contains(ltabs[m]) && j[ltabs[m]].is_array()) {
+                    size_t available_keys = std::min(j[ltabs[m]].size(), size_t(18));
+                    for (size_t k = 0; k < available_keys; ++k)
+                        current_profile[m][k] = j[ltabs[m]][k].get<macro>();
+                }
             }
         }
     } catch (...) {
@@ -109,10 +165,7 @@ void load_config(std::string name) {
 }
 
 void save_config(std::string name) {
-    nlohmann::json j;
-    for (size_t m = 0; m < 3; ++m)
-        for (size_t k = 0; k < 18; ++k)
-            j[JSON_MODES[m]][k] = current_profile[m][k];
+    nlohmann::json j = current_profile;
 
     std::ofstream file(config / "profiles" / name);
     if (file.is_open())
