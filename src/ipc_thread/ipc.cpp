@@ -1,9 +1,12 @@
 #include "ipc.hpp"
 
 void ipc_thread() {
-    mkfifo((const char*)"/tmp/gmacrod.pipe", 0666);
+    umask(0077);
+    // ~/.config/gmacrod/gmacrod.pipe maybe  
+    std::filesystem::path pipe = config / "gmacrod.pipe";
+    mkfifo(pipe.c_str(), 0600);
     while (running) {
-        int fd = open((const char*)"/tmp/gmacrod.pipe", O_RDONLY);
+        int fd = open(pipe.c_str(), O_RDONLY);
         if (fd < 0) continue;
 
         char buf[64] = {};

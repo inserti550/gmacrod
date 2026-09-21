@@ -131,8 +131,13 @@ void generate_config() {
 }
 
 void load_config(std::string name) {
-    std::filesystem::path path = config / "profiles" / name;
-
+    //https://cppreference.com/cpp/filesystem/canonical
+    std::filesystem::path fname = std::filesystem::path(name).filename();
+    if (fname.empty() || fname == "." || fname == "..") {
+        std::cerr << "invalid profile name " << name << "\n";
+        return;
+    }
+    std::filesystem::path path = config / "profiles" / fname;
     std::ifstream file(path);
     if (!file.is_open()) return;
 
@@ -170,9 +175,14 @@ void load_config(std::string name) {
 }
 
 void save_config(std::string name) {
+    std::filesystem::path fname = std::filesystem::path(name).filename();
+    if (fname.empty() || fname == "." || fname == "..") {
+        std::cerr << "invalid profile name " << name << "\n";
+        return;
+    }
+    std::filesystem::path path = config / "profiles" / fname;
     nlohmann::json j = current_profile;
-
-    std::ofstream file(config / "profiles" / name);
+    std::ofstream file(path);
     if (file.is_open())
         file << j.dump(4);
 }
